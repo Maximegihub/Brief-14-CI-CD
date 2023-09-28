@@ -69,36 +69,64 @@ resource "null_resource" "ssh_target" {
             #"sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg",
             #"sudo echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null",
             #"apt install -y docker-ce docker-ce-cli containerd.io docker-compose -y",
+
+            # Mise à jour du dépôt 
+            "sudo apt-get update",
+            "sudo apt-get upgrade -y",
+
             #Installation de docker
             "curl -fsSL https://get.docker.com -o get-docker.sh",
             "sudo sh get-docker.sh",
             "groupadd docker",
             "usermod -aG docker $USER",
-            #"sudo apt-get update",
-            #"sudo apt-get install -y docker-ce docker-ce-cli containerd.io",
             "sudo systemctl start docker",
             "sudo systemctl enable docker",
             "sudo docker pull hello-world",
             "sudo docker run hello-world",
-            # Instalaltion de minukube
+
+            # Installation de git
+            "apt-get install git -y",
+            "mkdir yaml",
+
+            # Installation de minukube
             "curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/",
             "sudo chmod +x minikube",
             "sudo mv minikube /usr/local/bin/",
             "minikube start --driver=docker --force",
+
+             # Installation de kubectl (outil de ligne de commande Kubernetes)
+            "curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl",
+            "chmod +x kubectl",
+            "sudo mv kubectl /usr/local/bin/",
+
             # Création d'un réseau Docker personnalisé
             "docker network create --subnet=192.168.50.0/24 custom-net",
+
             # Création d'un conteneur GitLab avec une adresse IP statique
             "docker run --name gitlab-container -d --net custom-net --ip 192.168.50.110 gitlab/gitlab-ce",
-            # Installation de git
-            "apt-get install git -y",
-            # Copie du script gitlab sur la vm
-            "curl -o install_gitlab_runner.sh https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64",
-            "chmod +x install_gitlab_runner.sh",
-            # Installation de GitLab Runner dans le conteneur GitLab
-            "docker exec -it gitlab-container /bin/bash -c 'chmod +x /install_gitlab_runner.sh'",
-            "docker exec -it gitlab-container /bin/bash -c '/install_gitlab_runner.sh'",
-            # Entrer dans le conteneur GitLab (facultatif)
-            "docker exec -it gitlab-container /bin/bash",
+        
+            # Déploiement de PrestaShop avec kubectl
+            "kubectl create deployment prestashop --image=prestashop/prestashop",
+            "kubectl scale deployment prestashop --replicas=2",
+
+
+            # Attente jusqu'à ce que le pod PrestaShop soit en cours d'exécution
+            "while [[ $(kubectl get pods -l app=prestashop -o jsonpath='{.items[0].status.phase}') != 'Running' ]]; do",
+            "  sleep 5",
+            "done",
+            "kubectl expose deployment prestashop --type=NodePort --port=80",
+        
+            # Exposer PrestaShop via Minikube
+            "kubectl port-forward service/prestashop 8080:80",
+
+            # Déploiement de gitlab avec kubectl
+            #"kubectl create deployment gitlab --image=gitlab/gitlab-ce",
+            #"kubectl scale deployment prestashop --replicas=2",
+
+             # Exposer Gitlab via Minikube
+            #"kubectl port-forward service/gitlab 8080:83",
+      
         ]
     }
 }
+
