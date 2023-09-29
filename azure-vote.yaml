@@ -1,0 +1,9 @@
+resource "null_resource" "deploy_application" {
+  depends_on = [null_resource.verify_kubectl]
+
+  provisioner "local-exec" {
+    command = "kubectl apply -f azure-vote.yaml"
+  }
+}
+
+
